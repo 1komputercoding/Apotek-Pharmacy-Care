@@ -44,6 +44,8 @@ td{padding:10px 11px;border-bottom:1px solid #edf0f2;font-size:13px}
 @media(max-width:900px){.cards{grid-template-columns:repeat(2,1fr)}.controls{grid-template-columns:1fr 1fr}.controls input{grid-column:1/-1}.detailcards{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:600px){.wrap{padding:10px}.header{padding:14px;gap:12px}.logo{width:120px;height:72px}.header h1{font-size:20px}.header p{font-size:12px}.cards{grid-template-columns:1fr 1fr}.controls{grid-template-columns:1fr}.detailcards{grid-template-columns:1fr 1fr}}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -71,7 +73,7 @@ td{padding:10px 11px;border-bottom:1px solid #edf0f2;font-size:13px}
       <option value="priceAsc">Harga Terakhir Terendah</option>
     </select>
     <select id="pageSize"><option>100</option><option>250</option><option>500</option><option>1000</option></select>
-    <button onclick="resetFilter()">Reset</button>
+    <button onclick="resetFilter()">Reset</button><button onclick="downloadPDF()" style="background:#b91c1c">📄 Download PDF</button>
   </div>
 
   <div class="tablebox">
@@ -215,6 +217,97 @@ function openProduct(name){
     rows.map((r,i)=>`<tr><td>${i+1}</td><td>${dateText(r[3])}</td><td>${dateText(r[4])}</td><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[11])}</td><td>${esc(r[6])} ${esc(r[5])}</td><td class="price">${money(r[7])}</td><td class="price">${money(r[8])}</td><td>${esc(r[9])}</td><td class="price">${money(r[12])}</td></tr>`).join('')+'</tbody></table>';
   document.getElementById('modal').style.display='block';
 }
+
+function downloadPDF(){
+  if(!filteredRows.length){
+    alert('Tidak ada data yang dapat dibuat PDF.');
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({orientation:'landscape', unit:'mm', format:'a4'});
+
+  const now = new Date().toLocaleString('id-ID');
+  const search = document.getElementById('search').value.trim();
+  const pbf = document.getElementById('pbf').value;
+  const sort = document.getElementById('sort').value;
+
+  // Header
+  doc.setFontSize(16);
+  doc.setFont(undefined,'bold');
+  doc.text('APOTEK Pharmacy CARE', 14, 13);
+  doc.setFontSize(13);
+  doc.text('Daftar Harga Pembelian Terakhir', 14, 20);
+
+  doc.setFontSize(8.5);
+  doc.setFont(undefined,'normal');
+  doc.text('Tanggal cetak: ' + now, 14, 27);
+  doc.text('Jumlah obat: ' + filteredRows.length.toLocaleString('id-ID'), 14, 32);
+
+  let filterText = [];
+  if(search) filterText.push('Pencarian: '+search);
+  if(pbf) filterText.push('PBF: '+pbf);
+  if(filterText.length) doc.text(filterText.join(' | '), 14, 37);
+
+  const body = filteredRows.map((r,i)=>[
+    i+1,
+    String(r[2]||''),
+    dateText(r[3]),
+    String(r[0]||''),
+    String(r[11]||''),
+    String(r[6]||'')+' '+String(r[5]||''),
+    money(r[7]),
+    money(r[8]),
+    String(r[9]||''),
+    money(r[12])
+  ]);
+
+  doc.autoTable({
+    startY: filterText.length ? 42 : 36,
+    head:[[
+      'No','Nama Barang','Tgl Terakhir','No PO','PBF',
+      'Qty','HNA','HNA PPN','Diskon','Harga Perolehan Terakhir'
+    ]],
+    body:body,
+    theme:'grid',
+    styles:{
+      fontSize:6.5,
+      cellPadding:1.8,
+      overflow:'linebreak',
+      valign:'middle'
+    },
+    headStyles:{
+      fillColor:[22,101,52],
+      textColor:255,
+      fontStyle:'bold',
+      fontSize:6.5
+    },
+    columnStyles:{
+      0:{cellWidth:9},
+      1:{cellWidth:45},
+      2:{cellWidth:22},
+      3:{cellWidth:22},
+      4:{cellWidth:38},
+      5:{cellWidth:18},
+      6:{cellWidth:22},
+      7:{cellWidth:23},
+      8:{cellWidth:14},
+      9:{cellWidth:31}
+    },
+    didDrawPage:function(data){
+      const pageCount = doc.internal.getNumberOfPages();
+      doc.setFontSize(7);
+      doc.text(
+        'Apotek Pharmacy CARE | Halaman '+data.pageNumber+' / '+pageCount,
+        14, 202
+      );
+    }
+  });
+
+  const filename='Harga_Update_Terakhir_'+new Date().toISOString().slice(0,10)+'.pdf';
+  doc.save(filename);
+}
+
 function closeModal(){document.getElementById('modal').style.display='none';}
 loadData();
 </script>
