@@ -46,6 +46,7 @@ td{padding:10px 11px;border-bottom:1px solid #edf0f2;font-size:13px}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -73,7 +74,7 @@ td{padding:10px 11px;border-bottom:1px solid #edf0f2;font-size:13px}
       <option value="priceAsc">Harga Terakhir Terendah</option>
     </select>
     <select id="pageSize"><option>100</option><option>250</option><option>500</option><option>1000</option></select>
-    <button onclick="resetFilter()">Reset</button><button onclick="downloadPDF()" style="background:#b91c1c">📄 Download PDF</button>
+    <button onclick="resetFilter()">Reset</button><button onclick="downloadPDF()" style="background:#b91c1c">📄 Download PDF</button><button onclick="downloadExcel()" style="background:#1667a8">📊 Download Excel</button>
   </div>
 
   <div class="tablebox">
@@ -216,6 +217,28 @@ function openProduct(name){
   document.getElementById('historyContent').innerHTML=`<table><thead><tr><th>No</th><th>Tgl Terima</th><th>Tgl Faktur</th><th>No PO</th><th>No Faktur</th><th>PBF</th><th>Qty</th><th>HNA</th><th>HNA PPN</th><th>Diskon</th><th>Harga Perolehan</th></tr></thead><tbody>`+
     rows.map((r,i)=>`<tr><td>${i+1}</td><td>${dateText(r[3])}</td><td>${dateText(r[4])}</td><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[11])}</td><td>${esc(r[6])} ${esc(r[5])}</td><td class="price">${money(r[7])}</td><td class="price">${money(r[8])}</td><td>${esc(r[9])}</td><td class="price">${money(r[12])}</td></tr>`).join('')+'</tbody></table>';
   document.getElementById('modal').style.display='block';
+}
+
+function downloadExcel(){
+  if(!filteredRows.length){ alert('Tidak ada data yang dapat dibuat Excel.'); return; }
+  const data=filteredRows.map((r,i)=>({
+    'No':i+1,'Nama Barang':String(r[2]||''),'Tgl Pembelian Terakhir':dateText(r[3]),
+    'No PO':String(r[0]||''),'No Faktur':String(r[1]||''),'PBF Terakhir':String(r[11]||''),
+    'Satuan':String(r[5]||''),'Qty':num(r[6]),'HNA':num(r[7]),'HNA PPN':num(r[8]),
+    'Diskon':String(r[9]||''),'Bonus':String(r[10]||''),'Harga Perolehan Terakhir':num(r[12])
+  }));
+  const ws=XLSX.utils.json_to_sheet(data);
+  ws['!cols']=[{wch:6},{wch:38},{wch:20},{wch:16},{wch:18},{wch:32},{wch:10},{wch:10},{wch:15},{wch:15},{wch:10},{wch:10},{wch:25}];
+  const info=XLSX.utils.aoa_to_sheet([
+    ['APOTEK Pharmacy CARE'],['Daftar Harga Pembelian Terakhir'],
+    ['Tanggal cetak',new Date().toLocaleString('id-ID')],['Jumlah obat',filteredRows.length],
+    ['Pencarian',document.getElementById('search').value||'Semua'],['PBF',document.getElementById('pbf').value||'Semua']
+  ]);
+  info['!cols']=[{wch:24},{wch:55}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Harga Terakhir');
+  XLSX.utils.book_append_sheet(wb,info,'Info');
+  XLSX.writeFile(wb,'Harga_Update_Terakhir_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
 function downloadPDF(){
